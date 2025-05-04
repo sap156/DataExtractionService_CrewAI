@@ -6,18 +6,21 @@ from crewai import Agent, Task, Crew
 from crewai_tools import ScrapeElementFromWebsiteTool
 from openai import OpenAI
 import os
+import textwrap
 from dotenv import load_dotenv
-load_dotenv()
 
+load_dotenv()
 router = APIRouter()
 
-# ✅ Initialize OpenAI client (v1.x compatible)
-client = OpenAI() 
+# ✅ OpenAI client
+client = OpenAI()
+
 
 # ---------------------- Scrape Request ----------------------
 class ScrapeRequest(BaseModel):
     url: str
     selector: str
+
 
 @router.post("/scrape")
 def scrape_elements(request: ScrapeRequest):
@@ -53,17 +56,37 @@ def scrape_elements(request: ScrapeRequest):
         return {"error": f"Tool execution failed: {str(e)}"}
 
 
+# ---------------------- Chunking Helper ----------------------
+def chunk_prompt_and_format(selector_content, client, model="gpt-4o-mini"):
+    raw_text = str(selector_content)
+    chunks = textwrap.wrap(raw_text, width=6000)  # safe chunk size
+    formatted_chunks = []
+
+    for i, chunk in enumerate(chunks):
+        prompt = f"""Convert the following web scraped dictionary (chunk {i+1}) into structured JSON format:
+
+{chunk}
+
+Return ONLY valid JSON fragment."""
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        formatted_chunks.append(response.choices[0].message.content.strip())
+
+    return "[\n" + ",\n".join(formatted_chunks) + "\n]"
+
+
 # ---------------------- Scrape-All Endpoint ----------------------
 @router.get("/scrape-all")
 def scrape_all_elements(url: str):
     try:
-        response = requests.get(url, timeout=10) 
+        response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, "html.parser")
 
         selector_content = {}
-        unique_selectors = set()  # Using a set for better performance
+        unique_selectors = set()
 
-        # Collect all unique tag selectors
         for tag in soup.find_all():
             unique_selectors.add(tag.name)
 
@@ -73,23 +96,12 @@ def scrape_all_elements(url: str):
                 text = tag.get_text(strip=True)
                 if text:
                     selector_content[tag_name].append(text)
-        
-        # Filter out non-visible tags BEFORE building the prompt
+
         ignored_tags = {"style", "script", "meta", "head", "link", "noscript"}
         visible_content = {k: v for k, v in selector_content.items() if k not in ignored_tags}
 
-        # ✅ Use OpenAI to format the output
-        prompt = f"""Format the following scraped data as structured JSON:
-
-{visible_content}
-
-Return only valid JSON.
-"""
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        formatted_json = response.choices[0].message.content
+        # ✅ Use OpenAI with chunking
+        formatted_json = chunk_prompt_and_format(visible_content, client)
 
         return {"result": formatted_json}
 
@@ -99,8 +111,9 @@ Return only valid JSON.
 
 # ---------------------- Ask API ----------------------
 class AskRequest(BaseModel):
-    data: str  # Structured JSON as string
+    data: str
     question: str
+
 
 @router.post("/ask")
 def ask_question(request: AskRequest):
@@ -119,8 +132,7 @@ Be concise and specific. If the answer isn't clear from the data, say "Not enoug
             messages=[{"role": "user", "content": prompt}]
         )
 
-        answer = response.choices[0].message.content
-        return {"answer": answer}
+        return {"answer": response.choices[0].message.content}
 
     except Exception as e:
         return {"error": str(e)}

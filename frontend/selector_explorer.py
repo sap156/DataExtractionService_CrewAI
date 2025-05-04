@@ -24,6 +24,14 @@ with tab1:
                     st.session_state.structured_data = formatted
                     st.success("✅ Structured content:")
                     st.code(formatted, language="json")
+
+                    # ✅ Download button for structured data
+                    st.download_button(
+                        label="📥 Download JSON",
+                        data=formatted,
+                        file_name="scraped_data.json",
+                        mime="application/json"
+                    )
                 else:
                     st.error(data.get("error", "No data returned."))
 
@@ -51,24 +59,37 @@ with tab1:
             except Exception as e:
                 st.error(f"Q&A failed: {e}")
 
+
 # ------------------- TAB 2: IMAGE TEXT EXTRACTOR -------------------
 with tab2:
-    st.subheader("Extract content from an image")
+    st.subheader("Extract content from an image using Vision AI")
 
-    image_file = st.file_uploader("📷 Upload an image", type=["png", "jpg", "jpeg"])
+    image_file = st.file_uploader("📷 Upload an image", type=["png", "jpg", "jpeg", "webp", "gif"])
 
     if image_file and st.button("Extract Text from Image"):
-        with st.spinner("Processing image..."):
+        with st.spinner("Analyzing image with Vision Tool..."):
             try:
-                res = requests.post("http://localhost:8000/api/vision", files={"file": image_file})
+                files = {"file": (image_file.name, image_file, image_file.type)}
+                res = requests.post("http://localhost:8000/api/vision", files=files)
                 data = res.json()
+
                 if "result" in data:
-                    st.success("Extracted Text:")
+                    st.success("✅ Extracted Text:")
                     st.text_area("Result", data["result"], height=300)
+
+                    # ✅ Add download button
+                    json_bytes = data["result"].encode("utf-8")
+                    st.download_button(
+                        label="⬇️ Download JSON",
+                        data=json_bytes,
+                        file_name="extracted_text.json",
+                        mime="application/json"
+                    )
                 else:
-                    st.error(data.get("error", "No text found."))
+                    st.error(data.get("error", "No text extracted from the image."))
             except Exception as e:
-                st.error(f"Image text extraction failed: {e}")
+                st.error(f"Vision tool failed: {e}")
+
 
 # ------------------- TAB 3: FILE TEXT EXTRACTOR -------------------
 with tab3:

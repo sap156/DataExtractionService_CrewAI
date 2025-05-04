@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query
 from bs4 import BeautifulSoup
 import requests
+import textwrap
 
 router = APIRouter()
 

@@ -6,3 +6,5 @@ openai
 beautifulsoup4
 requests
 pandas
+pytesseract 
+pillow

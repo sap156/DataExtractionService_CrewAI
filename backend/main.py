@@ -13,8 +13,8 @@ app = FastAPI(title="CrewAI Backend for Web Scraping and Extraction")
 
 # Register endpoints
 app.include_router(scrape_router, prefix="/api")
-app.include_router(vision_router, prefix="/api")
 app.include_router(file_read_router, prefix="/api")
+app.include_router(vision_router)
 app.include_router(selector_debugger_router)
 
 
