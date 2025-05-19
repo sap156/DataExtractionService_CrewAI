@@ -1,3 +1,4 @@
+# Import necessary modules and libraries
 from fastapi import APIRouter, Query
 from bs4 import BeautifulSoup
 import requests
@@ -9,26 +10,32 @@ import os
 import textwrap
 from dotenv import load_dotenv
 
+# Load environment variables from a .env file
 load_dotenv()
+
+# Create a new FastAPI router for scraping functionality
 router = APIRouter()
 
-# ✅ OpenAI client
+# Initialize the OpenAI client
 client = OpenAI()
 
 
 # ---------------------- Scrape Request ----------------------
+# Define a Pydantic model for the scrape request
 class ScrapeRequest(BaseModel):
-    url: str
-    selector: str
+    url: str  # The URL of the webpage to scrape
+    selector: str  # The CSS selector to target specific elements
 
 
 @router.post("/scrape")
 def scrape_elements(request: ScrapeRequest):
+    # Initialize the scraping tool with the provided URL and selector
     tool = ScrapeElementFromWebsiteTool(
         website_url=request.url,
         css_element=request.selector
     )
 
+    # Create an Agent with a specific role and goal for web scraping
     agent = Agent(
         role="Web Scraper",
         goal="Extract targeted content from websites using CSS selectors.",
@@ -37,6 +44,7 @@ def scrape_elements(request: ScrapeRequest):
         verbose=True,
     )
 
+    # Define a Task for the Agent to perform
     task = Task(
         description=(
             f"Extract all elements from {request.url} using the CSS selector '{request.selector}'. "
@@ -46,17 +54,21 @@ def scrape_elements(request: ScrapeRequest):
         agent=agent
     )
 
+    # Create a Crew to manage the Agent and Task, and execute the task
     crew = Crew(agents=[agent], tasks=[task])
     crew.kickoff()
 
     try:
+        # Run the scraping tool and return the output
         output = tool._run()
         return {"result": output}
     except Exception as e:
+        # Handle any errors that occur during the scraping process
         return {"error": f"Tool execution failed: {str(e)}"}
 
 
 # ---------------------- Chunking Helper ----------------------
+# Helper function to chunk and format scraped content using OpenAI
 def chunk_prompt_and_format(selector_content, client, model="gpt-4o-mini"):
     raw_text = str(selector_content)
     chunks = textwrap.wrap(raw_text, width=6000)  # safe chunk size
@@ -81,15 +93,18 @@ Return ONLY valid JSON fragment."""
 @router.get("/scrape-all")
 def scrape_all_elements(url: str):
     try:
+        # Send a GET request to the provided URL
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.text, "html.parser")
 
+        # Extract all unique HTML tags from the webpage
         selector_content = {}
         unique_selectors = set()
 
         for tag in soup.find_all():
             unique_selectors.add(tag.name)
 
+        # Collect text content for each unique tag
         for tag_name in unique_selectors:
             selector_content[tag_name] = []
             for tag in soup.select(tag_name):
@@ -97,19 +112,22 @@ def scrape_all_elements(url: str):
                 if text:
                     selector_content[tag_name].append(text)
 
+        # Filter out non-visible tags
         ignored_tags = {"style", "script", "meta", "head", "link", "noscript"}
         visible_content = {k: v for k, v in selector_content.items() if k not in ignored_tags}
 
-        # ✅ Use OpenAI with chunking
+        # Use OpenAI to format the visible content into JSON
         formatted_json = chunk_prompt_and_format(visible_content, client)
 
         return {"result": formatted_json}
 
     except Exception as e:
+        # Handle any errors that occur during the scraping process
         return {"error": str(e)}
 
 
 # ---------------------- Ask API ----------------------
+# Define the Ask API endpoint
 class AskRequest(BaseModel):
     data: str
     question: str

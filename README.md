@@ -7,6 +7,8 @@ A powerful data extraction service built with CrewAI for web scraping, image tex
 - **Web Scraping**: Extract data from websites using CSS selectors
 - **Structured Output**: Automatically formats scraped data into clean JSON
 - **AI-Powered Analysis**: Ask questions about scraped data using GPT-4
+- **File Reading**: Extract text from uploaded files
+- **Image Text Extraction**: Extract text from images using OCR
 - **Modular Design**: Built with FastAPI for high performance and scalability
 
 ## 📋 Prerequisites
@@ -15,11 +17,56 @@ A powerful data extraction service built with CrewAI for web scraping, image tex
 - OpenAI API key
 - Node.js (for frontend)
 
-## 🛠️ Installation
+## 🛠️ Backend Overview
+
+The backend is built using FastAPI and consists of the following components:
+
+### **`main.py`**
+
+The entry point for the backend application. It initializes the FastAPI app and registers the routes for various functionalities:
+
+- **`/api/scrape`**: Handles web scraping requests.
+- **`/api/scrape-all`**: Scrapes all visible elements from a webpage.
+- **`/api/vision`**: Extracts text from uploaded images using OCR.
+- **`/api/read-file`**: Reads and processes uploaded files.
+- **`/api/selectors`**: Debugs and inspects CSS selectors for a given webpage.
+
+### **`routes/scrape.py`**
+
+Handles web scraping functionality:
+
+- **`POST /api/scrape`**: Extracts specific elements from a webpage using CSS selectors.
+- **`GET /api/scrape-all`**: Scrapes all visible elements from a webpage and formats the data into JSON using OpenAI.
+- **Chunking Helper**: Splits large scraped content into smaller chunks for processing by OpenAI.
+
+### **`routes/vision.py`**
+
+Handles image text extraction:
+
+- **`POST /api/vision`**: Uses the VisionTool to extract text from uploaded images and formats the result into structured JSON using OpenAI.
+- Includes robust error handling and temporary file cleanup.
+
+### **`routes/file_read.py`**
+
+Handles file reading functionality:
+
+- **`POST /api/read-file`**: Reads the contents of uploaded files (e.g., `.txt`, `.csv`, `.json`) and returns structured data.
+- Uses the FileReadTool to process the files and manage tasks with CrewAI.
+
+### **`routes/selector_debugger.py`**
+
+Handles CSS selector debugging:
+
+- **`GET /api/selectors`**: Inspects a webpage and returns sample CSS selectors along with a preview of their content.
+- Useful for debugging and refining CSS selectors for web scraping.
+
+## 🔧 Usage
+
+### Starting the Backend Server
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/sap156/DataExtractionService_CrewAI.git
+git clone https://github.com/yourusername/DataExtractionService_CrewAI.git
 cd DataExtractionService_CrewAI
 ```
 
@@ -40,39 +87,91 @@ cp .env.example .env
 # Edit .env with your OpenAI API key
 ```
 
-## 🔧 Usage
-
-### Starting the Server
-
+4. Start the server:
 ```bash
 uvicorn backend.main:app --reload
 ```
 
 ### API Endpoints
 
-- **POST /scrape**
-  - Scrapes specific elements using CSS selectors
-  ```json
-  {
-    "url": "https://example.com",
-    "selector": ".target-class"
-  }
-  ```
+#### **POST /api/scrape**
+Extracts specific elements from a webpage using CSS selectors.
 
-- **GET /scrape-all**
-  - Scrapes all visible elements from a webpage
-  ```
-  /scrape-all?url=https://example.com
-  ```
+**Request Body:**
+```json
+{
+  "url": "https://example.com",
+  "selector": ".target-class"
+}
+```
 
-- **POST /ask**
-  - Ask questions about scraped data
-  ```json
-  {
-    "data": "<scraped_json_data>",
-    "question": "What are the main topics?"
-  }
-  ```
+**Response:**
+```json
+{
+  "result": ["Extracted content"]
+}
+```
+
+#### **GET /api/scrape-all**
+Scrapes all visible elements from a webpage.
+
+**Query Parameters:**
+- `url`: The URL of the webpage to scrape.
+
+**Response:**
+```json
+{
+  "result": [
+    {
+      "tag_name": ["Extracted content"]
+    }
+  ]
+}
+```
+
+#### **POST /api/vision**
+Extracts text from an uploaded image using OCR.
+
+**Request:**
+- Upload an image file.
+
+**Response:**
+```json
+{
+  "result": "Extracted text from image"
+}
+```
+
+#### **POST /api/read-file**
+Reads and processes uploaded files.
+
+**Request:**
+- Upload a file (e.g., `.txt`, `.csv`, `.json`).
+
+**Response:**
+```json
+{
+  "result": "File contents or structured data"
+}
+```
+
+#### **GET /api/selectors**
+Inspects and debugs CSS selectors for a given webpage.
+
+**Query Parameters:**
+- `url`: The URL of the webpage to inspect.
+
+**Response:**
+```json
+{
+  "selectors": [
+    {
+      "selector": "div.class-name",
+      "preview": "Sample content"
+    }
+  ]
+}
+```
 
 ## 🔒 Security
 
@@ -87,7 +186,6 @@ uvicorn backend.main:app --reload
 3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
-
 
 ## 🙏 Acknowledgments
 
